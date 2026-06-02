@@ -38,4 +38,5 @@ jobs:
           curl -skI https://localhost | grep  -qi "server: nginx" && echo "server_tokens leaked" || echo "server_tokens hidden"
       - name: Cleanup
         if: always()
-        run docker compose down --volumes
+        run:
+          docker compose down --volumes
