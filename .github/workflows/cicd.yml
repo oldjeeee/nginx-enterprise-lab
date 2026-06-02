@@ -31,7 +31,7 @@ jobs:
       - name: Deploy Simulation
         run: |
           mkdir -p certs
-          openssl req -x509 -nodes -days 1 -newkey rsa:2048 -keyout certs/privkey.pem -out certs/fullchain.pem -subj "CN/localhost"
+          openssl req -x509 -nodes -days 1 -newkey rsa:2048 -keyout certs/privkey.pem -out certs/fullchain.pem -subj "/CN=localhost"
           docker compose up -d --build
           sleep 5
           docker compose exec nginx nginx -t
@@ -47,5 +47,5 @@ jobs:
           curl -skI https://localhost | grep  -qi "server: nginx" && echo "server_tokens leaked" || echo "server_tokens hidden"
       - name: Cleanup
         if: always()
-        run:
+        run: |
           docker compose down --volumes
