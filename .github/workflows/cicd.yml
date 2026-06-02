@@ -1,0 +1,41 @@
+name: NGINX Enterprise CI/CD 2026
+on:
+  push:
+    branch: [ main ]
+  pull_request:
+    branch: [ main ]
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Security Tools
+        run: |
+          pip install checkov trivy
+          curl -L -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static
+          chmod +x opa && sudo mv opa /usr/local/bin/
+      - name: IaC & Config Security Scan
+        run: |
+          checkov -d . --compact
+          trivy config docker-compose.yml
+      - name: Deploy Simulation
+        run: |
+          mkdir -p certs
+          openssl req -x509 -nodes -days 1 -newkey rsa:2048 -keyout certs/privkey.pem -out certs/fullchain.pem -subj "CN/localhost"
+          docker compose up -d --build
+          sleep 5
+          docker compose exec nginx nginx -t
+          docker compose exec nginx nginx -T > parsed_config.json
+      - name: Policy Compliance Check (OPA)
+        run: |
+          opa eval -d policies/ -i parsed_config.json "data.nginx.compliance.deny"
+          echo "Compliance check passed"
+      - name: Functional & Security Headers Test
+        run: |
+          curl -sI http://localhost | grep -q "301" && echo "HTTP -> HTTPS redirect OK" || echo "Redirect failed!"
+          curl -skI https://localhost | grep -qi "strict-transport-security" && echo "HSTS present" || echo "HSTS missing"
+          curl -skI https://localhost | grep  -qi "server: nginx" && echo "server_tokens leaked" || echo "server_tokens hidden"
+      - name: Cleanup
+        if: always()
+        run docker compose down --volumes
